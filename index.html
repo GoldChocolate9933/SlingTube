@@ -309,7 +309,7 @@
       <h1>SlingTube</h1>
       <span id="videoCountDisplay" class="video-count-badge">0</span>
     </div>
-    <button id="refreshLibraryBtn" class="refresh-btn">
+    <button id="refreshLibraryBtn" class="refresh-btn hover-sound">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       refresh
     </button>
@@ -328,7 +328,7 @@
   <div class="modal-container">
     <div class="modal-header">
       <span id="modalVideoTitle" class="modal-video-title"></span>
-      <button id="closeModalBtn" class="close-modal-btn">✕</button>
+      <button id="closeModalBtn" class="close-modal-btn hover-sound">✕</button>
     </div>
     <div class="video-player-wrapper">
       <video id="modalVideoPlayer" controls autoplay playsinline>
@@ -362,6 +362,7 @@
     let soundExit = null;
     let soundHover = null;
     let wasPlaying = false;
+    let playSoundLocked = false;
 
     function createSound(src) {
       const audio = new Audio();
@@ -455,7 +456,7 @@
         const videoPath = VIDEO_DIR + filename;
         const displayTitle = formatVideoTitle(filename);
         const card = document.createElement('div');
-        card.className = 'video-card';
+        card.className = 'video-card hover-sound';
         card.innerHTML = `
           <div class="thumbnail-container">
             <img class="video-thumb" src="" alt="" style="display:none" onerror="this.style.display='none'">
@@ -466,13 +467,15 @@
             <div class="video-meta">${filename}</div>
           </div>`;
 
-        card.addEventListener('mouseenter', () => {
-          playSound(soundHover);
-        });
-
         card.addEventListener('click', () => openVideoModal(filename, videoPath, displayTitle));
         gridContainer.appendChild(card);
         createThumbnailPlaceholder(videoPath, card);
+      });
+
+      document.querySelectorAll('.hover-sound').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          playSound(soundHover);
+        });
       });
     }
 
@@ -484,10 +487,7 @@
       modalVideoPlayer.load();
       modalOverlay.classList.add('active');
       wasPlaying = false;
-      modalVideoPlayer.play().then(() => {
-        wasPlaying = true;
-        playSound(soundPlay);
-      }).catch(() => {});
+      playSoundLocked = false;
     }
 
     function closeModal() {
@@ -499,24 +499,33 @@
       if (sourceEl) sourceEl.setAttribute('src', '');
       modalVideoPlayer.load();
       wasPlaying = false;
+      playSoundLocked = false;
     }
 
     modalVideoPlayer.addEventListener('play', () => {
-      if (modalOverlay.classList.contains('active') && !wasPlaying) {
-        wasPlaying = true;
+      if (modalOverlay.classList.contains('active') && !playSoundLocked) {
+        playSoundLocked = true;
         playSound(soundPlay);
       }
     });
 
     modalVideoPlayer.addEventListener('pause', () => {
-      if (modalOverlay.classList.contains('active') && wasPlaying && !modalVideoPlayer.ended) {
-        wasPlaying = false;
+      if (modalOverlay.classList.contains('active') && !modalVideoPlayer.ended && playSoundLocked) {
+        playSoundLocked = false;
         playSound(soundPause);
       }
     });
 
     modalVideoPlayer.addEventListener('ended', () => {
+      playSoundLocked = false;
       wasPlaying = false;
+    });
+
+    modalVideoPlayer.addEventListener('volumechange', () => {
+      if (modalVideoPlayer.muted && modalOverlay.classList.contains('active') && playSoundLocked && !modalVideoPlayer.ended) {
+        playSoundLocked = false;
+        playSound(soundPause);
+      }
     });
 
     async function fetchVideoList() {
