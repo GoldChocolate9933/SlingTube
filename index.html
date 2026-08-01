@@ -331,7 +331,7 @@
       <button id="closeModalBtn" class="close-modal-btn hover-sound">✕</button>
     </div>
     <div class="video-player-wrapper">
-      <video id="modalVideoPlayer" controls autoplay playsinline>
+      <video id="modalVideoPlayer" controls playsinline>
         <source src="" type="video/mp4">
       </video>
     </div>
@@ -361,8 +361,8 @@
     let soundPause = null;
     let soundExit = null;
     let soundHover = null;
-    let wasPlaying = false;
-    let playSoundLocked = false;
+    let soundPlayLocked = false;
+    let hoverCooldown = false;
 
     function createSound(src) {
       const audio = new Audio();
@@ -381,9 +381,24 @@
 
     function playSound(audio) {
       if (!audio) return;
-      const clone = audio.cloneNode();
-      clone.volume = 0.25;
-      clone.play().catch(() => {});
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+
+    function playHoverSound() {
+      if (hoverCooldown) return;
+      hoverCooldown = true;
+      playSound(soundHover);
+      setTimeout(() => {
+        hoverCooldown = false;
+      }, 100);
+    }
+
+    function attachHoverSounds() {
+      document.querySelectorAll('.hover-sound').forEach(el => {
+        el.removeEventListener('mouseenter', playHoverSound);
+        el.addEventListener('mouseenter', playHoverSound);
+      });
     }
 
     function isVideoFile(filename) {
@@ -449,6 +464,7 @@
 
       if (videoList.length === 0) {
         gridContainer.innerHTML = `<div class="empty-state"><span>no videos</span></div>`;
+        attachHoverSounds();
         return;
       }
 
@@ -472,11 +488,7 @@
         createThumbnailPlaceholder(videoPath, card);
       });
 
-      document.querySelectorAll('.hover-sound').forEach(el => {
-        el.addEventListener('mouseenter', () => {
-          playSound(soundHover);
-        });
-      });
+      attachHoverSounds();
     }
 
     function openVideoModal(filename, fullPath, displayTitle) {
@@ -486,46 +498,37 @@
       if (sourceEl) sourceEl.setAttribute('src', fullPath);
       modalVideoPlayer.load();
       modalOverlay.classList.add('active');
-      wasPlaying = false;
-      playSoundLocked = false;
+      soundPlayLocked = false;
+      modalVideoPlayer.currentTime = 0;
     }
 
     function closeModal() {
       modalOverlay.classList.remove('active');
       modalVideoPlayer.pause();
-      playSound(soundExit);
       modalVideoPlayer.currentTime = 0;
       const sourceEl = modalVideoPlayer.querySelector('source');
       if (sourceEl) sourceEl.setAttribute('src', '');
       modalVideoPlayer.load();
-      wasPlaying = false;
-      playSoundLocked = false;
+      soundPlayLocked = false;
+      playSound(soundExit);
     }
 
     modalVideoPlayer.addEventListener('play', () => {
-      if (modalOverlay.classList.contains('active') && !playSoundLocked) {
-        playSoundLocked = true;
+      if (modalOverlay.classList.contains('active') && !soundPlayLocked) {
+        soundPlayLocked = true;
         playSound(soundPlay);
       }
     });
 
     modalVideoPlayer.addEventListener('pause', () => {
-      if (modalOverlay.classList.contains('active') && !modalVideoPlayer.ended && playSoundLocked) {
-        playSoundLocked = false;
+      if (modalOverlay.classList.contains('active') && !modalVideoPlayer.ended && soundPlayLocked) {
+        soundPlayLocked = false;
         playSound(soundPause);
       }
     });
 
     modalVideoPlayer.addEventListener('ended', () => {
-      playSoundLocked = false;
-      wasPlaying = false;
-    });
-
-    modalVideoPlayer.addEventListener('volumechange', () => {
-      if (modalVideoPlayer.muted && modalOverlay.classList.contains('active') && playSoundLocked && !modalVideoPlayer.ended) {
-        playSoundLocked = false;
-        playSound(soundPause);
-      }
+      soundPlayLocked = false;
     });
 
     async function fetchVideoList() {
