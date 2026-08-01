@@ -533,7 +533,10 @@
 
     async function fetchVideoList() {
       try {
-        const response = await fetch('videos.json');
+        const timestamp = new Date().getTime();
+        const response = await fetch('videos.json?t=' + timestamp, {
+          cache: 'no-store'
+        });
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) return data.filter(f => typeof f === 'string' && isVideoFile(f));
